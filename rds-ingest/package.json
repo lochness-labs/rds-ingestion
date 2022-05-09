@@ -1,0 +1,27 @@
+{
+  "name": "rds-ingestion",
+  "version": "2.0.0",
+  "description": "Database Ingestion for Data Lakes",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lochness-labs/rds-ingestion.git"
+  },
+  "author": "lochness-labs",
+  "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/lochness-labs/rds-ingestion/issues"
+  },
+  "homepage": "https://github.com/lochness-labs/rds-ingestion#readme",
+  "dependencies": {
+    "serverless": "^3.13.0",
+    "serverless-glue": "^2.8.0",
+    "serverless-plugin-log-retention": "^2.0.0"
+  },
+  "devDependencies": {
+    "serverless-step-functions": "^3.7.0"
+  }
+}

@@ -1,0 +1,22 @@
+env: ${file(./env/${self:provider.stage}.yml)}
+
+glue_args:
+  whl_wr: ${self:custom.s3_libs_path}/awswrangler-2.12.1-py3-none-any.whl
+  execute_libraries_upload: True # => You can set it as `False` to speed up the deployment if there are no updates to the libraries
+
+
+# Environment independent variables
+
+s3_libs_path: s3://${self:custom.env.code_bucket}/${self:custom.env.code_prefix}/${self:custom.env.job_name}/libraries
+
+logRetentionInDays: 14
+
+subscription_endpoint_01: ${self:custom.env.sns_subscription_01}
+
+sqs_queue_raw_name: ${self:service}-${self:provider.stage}
+
+stack_tags:
+  PROJECT: my-project
+  TYPE: ingestion
+  STACK: ${self:service}
+  ENVIRONMENT: ${self:provider.stage}

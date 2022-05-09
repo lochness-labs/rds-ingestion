@@ -1,0 +1,14 @@
+job_name: database_ingestion
+code_bucket: example-code-s3-bucket-name
+code_prefix: glue-code/scripts
+
+data_bucket: example-date-s3-bucket-name
+aws_region_name: eu-west-1
+
+sns_subscription_01: your@email.com
+
+glue_database_name: your_raw_db
+
+glue_connection_name: testconnection
+
+database_names: yourdb1, yourdb2

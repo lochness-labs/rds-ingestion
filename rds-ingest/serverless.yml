@@ -1,0 +1,35 @@
+service: rds-ingestion
+
+plugins:
+  - serverless-step-functions
+  - serverless-plugin-log-retention
+  - serverless-glue
+package:
+  exclude:
+    ${file(./serverless-parts/package-exclude.yml)}
+
+provider:
+  name: aws
+  runtime: python3.8
+  region: ${self:custom.env.aws_region_name}
+  stage: ${opt:stage}
+  deploymentBucket:
+    name: ${self:custom.env.code_bucket}
+    maxPreviousDeploymentArtifacts: 5
+  stackTags: ${self:custom.stack_tags}
+  iam: ${file(./serverless-parts/iam.yml)}
+
+custom: ${file(./serverless-parts/custom.yml)}
+
+Glue:
+  ${file(./serverless-parts/glue.yml)}
+
+functions:
+  ${file(./serverless-parts/functions.yml)}
+
+resources:
+  ${file(./serverless-parts/resources.yml)}
+
+stepFunctions:
+  ${file(./serverless-parts/stepFunctions.yml)}
+

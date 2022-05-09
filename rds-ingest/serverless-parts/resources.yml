@@ -1,0 +1,95 @@
+Resources:
+
+  SNSTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      DisplayName: SNS Topic
+      TopicName: ${self:provider.stage}-${self:service}-Error
+
+  SNSSubscription1:
+    Type: AWS::SNS::Subscription
+    Properties:
+        Endpoint: ${self:custom.subscription_endpoint_01}
+        Protocol: email
+        TopicArn: {"Ref": "SNSTopic"}
+
+  # Make Glue database
+  GlueDatabase: # TODO/FEAT: Move this to a general infrastructure setup repository
+    Type: AWS::Glue::Database
+    Properties:
+      CatalogId: ${aws:accountId}
+      DatabaseInput:
+        Name: ${self:custom.env.glue_database_name}
+
+  GlueRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: ${self:provider.stage}-${self:service}-GlueRole
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - glue.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Path: "/"
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSGlueServiceRole
+      Policies:
+        - PolicyName: ${self:provider.stage}-${self:service}-GluePolicy
+          PolicyDocument:
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetBucketLocation
+                  - s3:AbortMultipartUpload
+                  - s3:ListMultipartUploadParts
+                  - s3:ListBucketMultipartUploads
+                Resource:
+                  - arn:aws:s3:::${self:custom.env.data_bucket}
+                  - arn:aws:s3:::${self:custom.env.code_bucket}
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:ListBucket
+                Resource:
+                  - arn:aws:s3:::${self:custom.env.data_bucket}/intake/*
+                  - arn:aws:s3:::${self:custom.env.data_bucket}/metadata/*
+                  - arn:aws:s3:::${self:custom.env.code_bucket}/${self:custom.env.code_prefix}/*
+
+  SQSRaw:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: ${self:custom.sqs_queue_raw_name}
+      DelaySeconds: 1
+      MaximumMessageSize: 262144
+      MessageRetentionPeriod: 1209600 # 14days
+      ReceiveMessageWaitTimeSeconds: 20
+      VisibilityTimeout: 3600 # (in seconds) must be greater then lambda time
+      RedrivePolicy:
+        deadLetterTargetArn:
+          Fn::GetAtt:
+          - SQSRawDLQ
+          - Arn
+        maxReceiveCount: 5 # Let message to re-appear in case of errors after visibility timeout. Then move to DLQ
+
+  SQSPolicyRaw:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      Queues:
+        - Ref: SQSRaw
+      PolicyDocument:
+        Statement:
+          - Effect: Allow
+            Action:
+              - SQS:*
+            Resource: "arn:aws:sqs:${aws:region}:${aws:accountId}:${self:custom.sqs_queue_raw_name}"
+
+  SQSRawDLQ:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: ${self:custom.sqs_queue_raw_name}DLQ
+      MessageRetentionPeriod: 1209600 # 14days
+      VisibilityTimeout: 1

@@ -1,0 +1,81 @@
+Comment: "Database State Machine"
+StartAt: MapLoader
+States:
+
+  MapLoader:
+    Type: Task
+    Resource:
+      Fn::GetAtt: [MapLoaderLambdaFunction, Arn]
+    Retry:
+      - ErrorEquals:
+          - Lambda.ServiceException
+          - Lambda.AWSLambdaException
+          - Lambda.SdkClientException
+        IntervalSeconds: 2
+        MaxAttempts: 6
+        BackoffRate: 2
+    Catch:
+      - ErrorEquals: ["States.ALL"]
+        Next: SendErrorsToSNS
+        ResultPath: $.error
+    Next: mapStateGlueJob
+
+  mapStateGlueJob:
+    Type: Map
+    ItemsPath: $
+    MaxConcurrency: 1 # TODO/FEAT/MoveToConf
+    Iterator:
+      StartAt: StartIngestion
+      States:
+        StartIngestion:
+          Type: Task
+          Resource: arn:aws:states:::glue:startJobRun.sync
+          Parameters:
+            JobName.$: $.resource_name
+            Arguments:
+              "--s3_data_bucket.$": $.s3_data_bucket
+              "--s3_code_bucket.$": $.s3_code_bucket
+              "--glue_connection_name.$": $.glue_connection_name
+              "--glue_database_name.$": $.glue_database_name
+              "--database_name.$": $.database_name
+          ResultPath: $.Arguments
+          Catch:
+            - ErrorEquals:
+                - States.ALL
+              Comment: ConditionalCheckFailedException
+              ResultPath: $
+              Next: CheckError
+          End: true
+        CheckError: # TODO/Feat/ImproveMonitoring
+          Type: Pass
+          End: true
+    Catch:
+      - ErrorEquals: ["States.ALL"]
+        Next: SendErrorsToSNS
+    Next: ExecutionSucceded
+
+  # https://www.serverless.com/plugins/serverless-step-functions/#catch-failure
+  SendErrorsToSNS:
+    Type: Task
+    Resource: arn:aws:states:::sns:publish
+    ResultPath: Null
+    Catch:
+      - ErrorEquals: ["States.ALL"]
+        Next: ExecutionFailed
+    Parameters:
+      TopicArn: {"Ref": "SNSTopic"}
+      Subject: (General.ERROR) - ${self:provider.stage}_${self:service}-${aws:accountId}
+      Message:
+        Input.$: $
+    Next: ExecutionFailed
+
+  ExecutionSucceded:
+    Type: Task
+    Resource: "arn:aws:states:::sqs:sendMessage"
+    Parameters:
+      QueueUrl: !Ref SQSRaw
+      MessageBody.$: $
+    End: True
+
+  ExecutionFailed:
+    Type: Fail
